@@ -43,6 +43,40 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
+//create Structure of PortPin ,Typedef it to type name PortPin
+typedef struct _PortPin
+{
+	GPIO_TypeDef* PORT;
+	uint16_t PIN;
+} PortPin;
+
+//declare PortPin R,L
+PortPin R[4] =
+{
+		{GPIOA,GPIO_PIN_10},
+		{GPIOB,GPIO_PIN_3},
+		{GPIOB,GPIO_PIN_5},
+		{GPIOB,GPIO_PIN_4}
+};
+
+PortPin L[4] =
+{
+		{GPIOA,GPIO_PIN_9},
+		{GPIOC,GPIO_PIN_7},
+		{GPIOB,GPIO_PIN_6},
+		{GPIOA,GPIO_PIN_7}
+};
+
+//For Button Contenter
+
+uint16_t ButtonMatrix=0;
+uint16_t L_ButtonMatrix=0;
+uint16_t correct_key[11] = {6,4,3,4,0,5,0,0,0,7,3};
+uint16_t current_key;
+uint16_t key[11];
+uint16_t j;
+uint16_t count = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -50,7 +84,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
-
+void ReadMatrixButton_1Row();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -95,9 +129,18 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  //Call function every 10 ms = 100Hz
+	  static uint32_t timestamp=0;
+	  if(HAL_GetTick()>=timestamp)
+	  {
+		  timestamp =HAL_GetTick() + 10;
+		  ReadMatrixButton_1Row();
+
+	  }
   }
   /* USER CODE END 3 */
 }
@@ -199,6 +242,12 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(R1_GPIO_Port, R1_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, R2_Pin|R4_Pin|R3_Pin, GPIO_PIN_SET);
+
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
@@ -212,10 +261,180 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : L4_Pin L1_Pin */
+  GPIO_InitStruct.Pin = L4_Pin|L1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : L2_Pin */
+  GPIO_InitStruct.Pin = L2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(L2_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : R1_Pin */
+  GPIO_InitStruct.Pin = R1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(R1_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : R2_Pin R4_Pin R3_Pin */
+  GPIO_InitStruct.Pin = R2_Pin|R4_Pin|R3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : L3_Pin */
+  GPIO_InitStruct.Pin = L3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(L3_GPIO_Port, &GPIO_InitStruct);
+
 }
 
 /* USER CODE BEGIN 4 */
+void ReadMatrixButton_1Row()
+{
+	//
+	static uint8_t X = 0;
 
+	//READ L1-L4
+	register int i;
+	for(i=0;i<4;i++)
+	{
+		if(HAL_GPIO_ReadPin(L[i].PORT, L[i].PIN))
+		{
+			ButtonMatrix &= ~(1<<(X*4+i));
+
+		}
+		else
+		{
+			ButtonMatrix |= 1<<(X*4+i);
+		}
+
+	}
+	//SET RX
+	HAL_GPIO_WritePin(R[X].PORT, R[X].PIN, 1);
+	//RESET RX+1%4
+	HAL_GPIO_WritePin(R[(X+1)%4].PORT, R[(X+1)%4].PIN, 0);
+	X++;
+	X%=4;
+
+
+	if(ButtonMatrix != 0 && L_ButtonMatrix == 0)
+	{
+		if(ButtonMatrix == 0b1000000000000)
+		{
+			current_key = 0;
+			count = 0;
+			j = 0;
+			key[0] = 0;
+			key[1] = 0;
+			key[2] = 0;
+			key[3] = 0;
+			key[4] = 0;
+			key[5] = 0;
+			key[6] = 0;
+			key[7] = 0;
+			key[8] = 0;
+			key[9] = 0;
+			key[10] = 0;
+		}
+		if(count == 11)
+		{
+			if(ButtonMatrix == 0b1000000000000000)
+			{
+				for(j=0;j<11;j++)
+				{
+					if(key[j] == correct_key[j])
+					{
+						continue;
+					}
+					else
+					{
+						break;
+					}
+				}
+			}
+		}
+		else if(ButtonMatrix == 0b1)
+		{
+			current_key = 7;
+			count++;
+			key[0] = key[1];key[1] = key[2];key[2] = key[3];key[3] = key[4];key[4] = key[5];key[5] = key[6];key[6] = key[7];key[7] = key[8];key[8] = key[9];key[9] = key[10];key[10] = current_key;
+		}
+		else if(ButtonMatrix == 0b10)
+		{
+			current_key = 4;
+			count++;
+			key[0] = key[1];key[1] = key[2];key[2] = key[3];key[3] = key[4];key[4] = key[5];key[5] = key[6];key[6] = key[7];key[7] = key[8];key[8] = key[9];key[9] = key[10];key[10] = current_key;
+		}
+		else if(ButtonMatrix == 0b100)
+		{
+			current_key = 1;
+			count++;
+			key[0] = key[1];key[1] = key[2];key[2] = key[3];key[3] = key[4];key[4] = key[5];key[5] = key[6];key[6] = key[7];key[7] = key[8];key[8] = key[9];key[9] = key[10];key[10] = current_key;
+		}
+		else if(ButtonMatrix == 0b1000)
+		{
+			current_key = 0;
+			count++;
+			key[0] = key[1];key[1] = key[2];key[2] = key[3];key[3] = key[4];key[4] = key[5];key[5] = key[6];key[6] = key[7];key[7] = key[8];key[8] = key[9];key[9] = key[10];key[10] = current_key;
+		}
+		else if(ButtonMatrix == 0b10000)
+		{
+			current_key = 8;
+			count++;
+			key[0] = key[1];key[1] = key[2];key[2] = key[3];key[3] = key[4];key[4] = key[5];key[5] = key[6];key[6] = key[7];key[7] = key[8];key[8] = key[9];key[9] = key[10];key[10] = current_key;
+		}
+		else if(ButtonMatrix == 0b100000)
+		{
+			current_key = 5;
+			count++;
+			key[0] = key[1];key[1] = key[2];key[2] = key[3];key[3] = key[4];key[4] = key[5];key[5] = key[6];key[6] = key[7];key[7] = key[8];key[8] = key[9];key[9] = key[10];key[10] = current_key;
+		}
+		else if(ButtonMatrix == 0b1000000)
+		{
+			current_key = 2;
+			count++;
+			key[0] = key[1];key[1] = key[2];key[2] = key[3];key[3] = key[4];key[4] = key[5];key[5] = key[6];key[6] = key[7];key[7] = key[8];key[8] = key[9];key[9] = key[10];key[10] = current_key;
+		}
+		else if(ButtonMatrix == 0b100000000)
+		{
+			current_key = 9;
+			count++;
+			key[0] = key[1];key[1] = key[2];key[2] = key[3];key[3] = key[4];key[4] = key[5];key[5] = key[6];key[6] = key[7];key[7] = key[8];key[8] = key[9];key[9] = key[10];key[10] = current_key;
+		}
+		else if(ButtonMatrix == 0b1000000000)
+		{
+			current_key = 6;
+			count++;
+			key[0] = key[1];key[1] = key[2];key[2] = key[3];key[3] = key[4];key[4] = key[5];key[5] = key[6];key[6] = key[7];key[7] = key[8];key[8] = key[9];key[9] = key[10];key[10] = current_key;
+		}
+		else if(ButtonMatrix == 0b10000000000)
+		{
+			current_key = 3;
+			count++;
+			key[0] = key[1];key[1] = key[2];key[2] = key[3];key[3] = key[4];key[4] = key[5];key[5] = key[6];key[6] = key[7];key[7] = key[8];key[8] = key[9];key[9] = key[10];key[10] = current_key;
+		}
+
+
+		if(j == 11)
+		{
+			HAL_GPIO_WritePin (GPIOA, GPIO_PIN_5, 1);
+		}
+		else
+		{
+			HAL_GPIO_WritePin (GPIOA, GPIO_PIN_5, 0);
+		}
+	}
+
+
+	L_ButtonMatrix = ButtonMatrix;
+}
 /* USER CODE END 4 */
 
 /**
